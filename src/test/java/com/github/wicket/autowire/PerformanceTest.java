@@ -13,13 +13,11 @@
  */
 package com.github.wicket.autowire;
 
+import java.util.Arrays;
+
 import org.apache.wicket.markup.html.WebPage;
-import org.apache.wicket.markup.html.basic.Label;
-import org.apache.wicket.markup.html.link.Link;
 import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.html.list.ListView;
-
-import java.util.Arrays;
 
 public class PerformanceTest extends WebPage {
 

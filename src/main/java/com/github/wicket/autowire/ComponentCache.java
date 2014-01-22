@@ -7,9 +7,6 @@ import org.apache.wicket.Component;
 /**
 *
 */
-class ComponentCache
-		extends
-		ConcurrentHashMap<Class<? extends Component>, Value>
+class ComponentCache extends ConcurrentHashMap<Class<? extends Component>, Value>
 {
-
 }

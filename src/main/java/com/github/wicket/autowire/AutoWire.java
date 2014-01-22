@@ -26,6 +26,7 @@ import org.apache.wicket.application.IComponentInitializationListener;
 import org.apache.wicket.application.IComponentInstantiationListener;
 import org.apache.wicket.markup.MarkupNotFoundException;
 import org.apache.wicket.markup.html.TransparentWebMarkupContainer;
+import org.apache.wicket.util.string.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +37,7 @@ public final class AutoWire
 {
 
 	private static final Logger log = LoggerFactory.getLogger(Component.class);
+
 	private static final ComponentCache CACHE = new ComponentCache();
 
 	private AutoWire()
@@ -46,8 +48,9 @@ public final class AutoWire
 	public static void install(final Application application)
 	{
 		final AutoWire instance = new AutoWire();
-		application.getComponentInitializationListeners().add(instance);
+
 		application.getComponentInstantiationListeners().add(instance);
+		application.getComponentInitializationListeners().add(instance);
 	}
 
 	@Override
@@ -57,10 +60,7 @@ public final class AutoWire
 		Value value = CACHE.get(componentClass);
 		if (value == null)
 		{
-			if (log.isTraceEnabled())
-			{
-				log.trace("MISS: {}", componentClass);
-			}
+			log.trace("MISS: {}", componentClass);
 
 			synchronized (AutoWire.class)
 			{
@@ -70,11 +70,32 @@ public final class AutoWire
 					List<Action> actions = getInstantiationActions(component);
 
 					value = new Value(actions);
-					CACHE.put(componentClass, value);
+					Value old = CACHE.putIfAbsent(componentClass, value);
+					if (old != null)
+					{
+						value = old;
+					}
 				}
 			}
 		}
 		value.performInstantiationActions(component);
+	}
+
+	@Override
+	public void onInitialize(final Component component)
+	{
+		if (isAutoWiringPossible(component))
+		{
+			try
+			{
+				Value value = CACHE.get(component.getClass());
+				value.performInitializeActions((MarkupContainer) component);
+			}
+			catch (final MarkupNotFoundException e)
+			{
+				log.error("================ Markup not found for '{}'", component);
+			}
+		}
 	}
 
 	private List<Action> getInstantiationActions(Component component)
@@ -86,12 +107,10 @@ public final class AutoWire
 			Set<String> done = new HashSet<>();
 			Class<?> clazz = component.getClass();
 			// iterate over class hierarchy
-			while (Component.class.isAssignableFrom(clazz))
+			while (clazz != null && clazz.getName().startsWith("org.apache.wicket") == false)
 			{
-				if (log.isTraceEnabled())
-				{
-					log.trace("looking for fields in class " + clazz);
-				}
+				log.trace("looking for fields in class '{}'", clazz);
+
 				// iterate over declared field
 				for (final Field field : clazz.getDeclaredFields())
 				{
@@ -100,24 +119,22 @@ public final class AutoWire
 						AutoComponent ann = field.getAnnotation(AutoComponent.class);
 						if (ann.inject())
 						{
-							final String id = ann.id().isEmpty() ? field.getName() : ann.id();
+							String annotationId = ann.id();
+							String fieldName = field.getName();
+							final String id = Strings.isEmpty(annotationId) ? fieldName : annotationId;
 							// fields in super classes are ignored, if they are
 							// in subclasses too
 							if (!done.contains(id))
 							{
 								done.add(id);
-								Component value = Utils.getValue(component, field);
+								Component value = Utils.getChildComponent(component, field);
 								if (value == null)
 								{
 									actions.add(new AssignInstanceAction(field, id));
 								}
 								else
 								{
-									if (log.isTraceEnabled())
-									{
-										log.trace("Field " + field.getName()
-												+ " is already initialized. skipping.");
-									}
+									log.trace("Field '{}' is already initialized. Skipping.", fieldName);
 								}
 							}
 						}
@@ -133,22 +150,6 @@ public final class AutoWire
 		}
 
 		return actions;
-	}
-
-	@Override
-	public void onInitialize(final Component component)
-	{
-		if (isAutoWiringPossible(component))
-		{
-			try
-			{
-				Value value = CACHE.get(component.getClass());
-				value.performInitializeActions(component);
-			}
-			catch (final MarkupNotFoundException e)
-			{
-			}
-		}
 	}
 
 	private boolean isAutoWiringPossible(final Component component)

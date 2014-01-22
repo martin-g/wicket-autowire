@@ -23,12 +23,12 @@ public class AutoWireTest {
 
   @Before
   public void setUp() {
-    this.tester = new AutoWireTester();
+    tester = new AutoWireTester();
   }
 
   @Test
   public void testBasicPage() {
-    this.tester.startPage(BasicPage.class);
+    tester.startPage(BasicPage.class);
   }
 
   /**
@@ -37,7 +37,7 @@ public class AutoWireTest {
    */
   @Test
   public void testBasicPanel() {
-    this.tester.startComponentInPage(BasicPanel.class);
+    tester.startComponentInPage(BasicPanel.class);
   }
 
   /**
@@ -45,7 +45,7 @@ public class AutoWireTest {
    */
   @Test
   public void testSubClassPage() {
-    this.tester.startPage(SubClassPage.class);
+    tester.startPage(SubClassPage.class);
   }
 
   /**
@@ -55,7 +55,7 @@ public class AutoWireTest {
    */
   @Test
   public void testContainer() {
-    this.tester.startPage(ContainerPage.class);
+    tester.startPage(ContainerPage.class);
   }
 
   /**
@@ -64,7 +64,7 @@ public class AutoWireTest {
    */
   @Test
   public void testBorder() {
-    this.tester.startPage(BorderPage.class);
+    tester.startPage(BorderPage.class);
   }
 
   /**
@@ -73,7 +73,7 @@ public class AutoWireTest {
    */
   @Test
   public void testCustomId() {
-    this.tester.startComponentInPage(CustomIdPanel.class);
+    tester.startComponentInPage(CustomIdPanel.class);
   }
 
   /**
@@ -82,9 +82,9 @@ public class AutoWireTest {
    */
   @Test
   public void testManualInstantiation() {
-    this.tester.startPage(ManualInstantiationPage.class);
-    this.tester.assertLabel("test1", "test1");
-    this.tester.assertLabel("test2", "test2");
+    tester.startPage(ManualInstantiationPage.class);
+    tester.assertLabel("test1", "test1");
+    tester.assertLabel("test2", "test2");
   }
 
   /**
@@ -99,7 +99,7 @@ public class AutoWireTest {
    */
   @Test
   public void testMissingCloseTag() {
-    this.tester.startPage(MissingCloseTagPage.class);
+    tester.startPage(MissingCloseTagPage.class);
   }
 
   /**
@@ -108,7 +108,7 @@ public class AutoWireTest {
    */
   @Test
   public void testChildMarkupContainer() {
-    this.tester.startPage(ChildMarkupContainer.class);
+    tester.startPage(ChildMarkupContainer.class);
   }
 
   /**
@@ -117,7 +117,7 @@ public class AutoWireTest {
   @Test
   public void testPerformance() {
     long begin = System.currentTimeMillis();
-    this.tester.startPage(PerformanceTest.class);
+    tester.startPage(PerformanceTest.class);
     System.out.println("Performance test took " + (System.currentTimeMillis() - begin) + "ms");
   }
 
@@ -126,10 +126,10 @@ public class AutoWireTest {
    */
   @Test
   public void testPerformanceCompare() {
-    this.tester = new WicketTester();
+    tester = new WicketTester();
 
     long begin = System.currentTimeMillis();
-    this.tester.startPage(PerformanceCompareTest.class);
+    tester.startPage(PerformanceCompareTest.class);
     System.out.println("Performance compare test took " + (System.currentTimeMillis() - begin) + "ms");
   }
 }

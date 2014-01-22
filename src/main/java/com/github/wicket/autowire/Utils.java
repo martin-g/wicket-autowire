@@ -9,13 +9,13 @@ import org.apache.wicket.Component;
  */
 class Utils
 {
-	static Component getValue(Component component, Field field)
+	static Component getChildComponent(Component parent, Field field)
 	{
 		boolean accessible = field.isAccessible();
 		try
 		{
 			field.setAccessible(true);
-			return (Component)field.get(component);
+			return (Component)field.get(parent);
 		}
 		catch (IllegalAccessException e)
 		{
@@ -40,7 +40,7 @@ class Utils
 				{
 					if (field.isAnnotationPresent(AutoComponent.class))
 					{
-						value = getValue(component, field);
+						value = getChildComponent(component, field);
 						if (value != null && value.getId().equals(id))
 						{
 							child.field = field;
@@ -68,11 +68,13 @@ class Utils
 	}
 
 	// set value on duplicated field of parent classes too!
-	static void setValue(Component instance, final Component component, Field field)
+	static void setChildComponent(Component child, final Component parent, Field field)
 			throws IllegalAccessException
 	{
 		Class<?> clazz = field.getDeclaringClass();
-		while (Component.class.isAssignableFrom(clazz))
+
+		search:
+		while (clazz != null && clazz.getName().startsWith("org.apache.wicket") == false)
 		{
 			for (Field f : clazz.getDeclaredFields())
 			{
@@ -82,7 +84,8 @@ class Utils
 					try
 					{
 						f.setAccessible(true);
-						f.set(component, instance);
+						f.set(parent, child);
+						break search;
 					}
 					finally
 					{

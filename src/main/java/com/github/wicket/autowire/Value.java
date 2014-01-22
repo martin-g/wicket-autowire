@@ -1,10 +1,12 @@
 package com.github.wicket.autowire;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Stack;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.wicket.Component;
@@ -17,6 +19,7 @@ import org.apache.wicket.markup.WicketTag;
 import org.apache.wicket.markup.html.border.Border;
 import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.resolver.WicketContainerResolver;
+import org.apache.wicket.util.lang.Args;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,15 +30,16 @@ class Value
 {
 	private static final Logger LOGGER = LoggerFactory.getLogger(Value.class);
 
-	private List<Action> instantiationActions;
-	private Map<String, Node> cache = new ConcurrentHashMap<>();
+	private final List<Action> instantiationActions;
 
-	public Value(List<Action> instantiationActions)
+	private final ConcurrentMap<String, Node> cache = new ConcurrentHashMap<>();
+
+	Value(List<Action> instantiationActions)
 	{
-		this.instantiationActions = instantiationActions;
+		this.instantiationActions = Args.notNull(instantiationActions, "instantiationActions");
 	}
 
-	public void performInstantiationActions(Component component)
+	void performInstantiationActions(Component component)
 	{
 		for (Action action : instantiationActions)
 		{
@@ -43,9 +47,9 @@ class Value
 		}
 	}
 
-	public void performInitializeActions(Component component)
+	void performInitializeActions(MarkupContainer component)
 	{
-		final IMarkupFragment markup = ((MarkupContainer)component).getMarkup(null);
+		final IMarkupFragment markup = component.getMarkup(null);
 
 		if (markup == null)
 		{
@@ -77,17 +81,17 @@ class Value
 		cleanup();
 	}
 
-	// avoid memory leaks if makup is changing often.
+	// avoid memory leaks if markup is changing often.
 	private void cleanup()
 	{
-		long treshold = System.currentTimeMillis() - 8 * 24 * 60 * 60 * 1000;
+		long threshold = System.currentTimeMillis() - 8 * 24 * 60 * 60 * 1000;
 		if (cache.size() > 30)
 		{
-			for (Iterator<Map.Entry<String, Node>> iterator = cache.entrySet().iterator(); iterator
-					.hasNext();)
+			Iterator<Map.Entry<String, Node>> iterator = cache.entrySet().iterator();
+			while (iterator.hasNext())
 			{
 				Map.Entry<String, Node> next = iterator.next();
-				if (next.getValue().lastUsed < treshold)
+				if (next.getValue().lastUsed < threshold)
 				{
 					iterator.remove();
 				}
@@ -97,10 +101,9 @@ class Value
 
 	private Node getNode(Component component, IMarkupFragment markup)
 	{
-
 		final MarkupStream stream = new MarkupStream(markup);
 
-		final Stack<AtomicReference<Component>> stack = new Stack<>();
+		final Deque<AtomicReference<Component>> stack = new ArrayDeque<>();
 		stack.push(new AtomicReference<>(component));
 
 		Node node = new Node();
@@ -108,9 +111,10 @@ class Value
 		// detect borders.
 		boolean addToBorder = false;
 
-		if (LOGGER.isTraceEnabled())
+		boolean traceEnabled = LOGGER.isTraceEnabled();
+		if (traceEnabled)
 		{
-			LOGGER.trace("Performing auto wiring for component " + component);
+			LOGGER.trace("Performing auto wiring for component '{}'", component);
 		}
 
 		// no associated markup: component tag is part of the markup
@@ -119,9 +123,9 @@ class Value
 		// component tag of component is part its markup.
 		if (skipFirstComponentTag(component, stream))
 		{
-			if (LOGGER.isTraceEnabled())
+			if (traceEnabled)
 			{
-				LOGGER.trace("Skipped component tag " + stream.get());
+				LOGGER.trace("Skipped component tag '{}'", stream.get());
 			}
 			containerTag = stream.get();
 			stream.next();
@@ -131,9 +135,9 @@ class Value
 		{
 			final ComponentTag tag = stream.getTag();
 
-			if (LOGGER.isTraceEnabled())
+			if (traceEnabled)
 			{
-				LOGGER.trace("Processing tag " + tag);
+				LOGGER.trace("Processing tag '{}'", tag);
 			}
 
 			// track border tags
@@ -157,9 +161,9 @@ class Value
 				}
 			}
 
-			if (LOGGER.isTraceEnabled())
+			if (traceEnabled)
 			{
-				LOGGER.trace("addToBorder? " + addToBorder);
+				LOGGER.trace("addToBorder? '{}'", addToBorder);
 			}
 
 			// maintain bread crumbs and build components
@@ -171,9 +175,9 @@ class Value
 					final Component cmp;
 					final Node child = new Node();
 
-					if (LOGGER.isTraceEnabled())
+					if (traceEnabled)
 					{
-						LOGGER.trace("Current parent component is " + container);
+						LOGGER.trace("Current parent component is '{}'", container);
 					}
 					if (container == null)
 					{
@@ -184,9 +188,9 @@ class Value
 						cmp = Utils.buildComponent(component, tag.getId(), child);
 					}
 
-					if (LOGGER.isTraceEnabled())
+					if (traceEnabled)
 					{
-						LOGGER.trace("Resolved component is " + cmp + ". Adding to parent now.");
+						LOGGER.trace("Resolved component is '{}'. Adding to parent now.", cmp);
 					}
 
 					if (cmp != null)
@@ -202,7 +206,7 @@ class Value
 								child.border = false;
 							}
 							child.id = cmp.getId();
-							node.add(child);
+							node.addChild(child);
 						}
 						else if (container == null)
 						{
@@ -220,7 +224,7 @@ class Value
 					// auto-wired
 					if (tag.isOpen() && !tag.hasNoCloseTag())
 					{
-						if (LOGGER.isTraceEnabled())
+						if (traceEnabled)
 						{
 							LOGGER.trace("Tag has a body. Adding to stack now.");
 						}
@@ -229,9 +233,9 @@ class Value
 						{
 							node = child;
 						}
-						if (LOGGER.isTraceEnabled())
+						if (traceEnabled)
 						{
-							LOGGER.trace("Current stack: " + stack);
+							LOGGER.trace("Current stack: '{}'", stack);
 						}
 					}
 				}
@@ -241,7 +245,7 @@ class Value
 					// not pop stack on container tag close.
 					if (containerTag == null || !tag.closes(containerTag))
 					{
-						if (LOGGER.isTraceEnabled())
+						if (traceEnabled)
 						{
 							LOGGER.trace("Tag is closing. Pop the stack now.");
 						}
@@ -249,14 +253,14 @@ class Value
 						{
 							node = node.parent;
 						}
-						if (LOGGER.isTraceEnabled())
+						if (traceEnabled)
 						{
-							LOGGER.trace("Current stack: " + stack);
+							LOGGER.trace("Current stack: '{}'", stack);
 						}
 					}
 				}
 			}
-			if (LOGGER.isTraceEnabled())
+			if (traceEnabled)
 			{
 				LOGGER.trace("--- Tag done. ---");
 			}
@@ -272,8 +276,9 @@ class Value
 
 	private boolean skipFirstComponentTag(Component component, MarkupStream stream)
 	{
-		if (stream.get() instanceof ComponentTag
-				&& ((ComponentTag)stream.get()).getId().equals(component.getId()))
+		MarkupElement currentElement = stream.get();
+		if (currentElement instanceof ComponentTag
+				&& ((ComponentTag) currentElement).getId().equals(component.getId()))
 		{
 			return true;
 		}

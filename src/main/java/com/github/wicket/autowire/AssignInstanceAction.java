@@ -2,30 +2,25 @@ package com.github.wicket.autowire;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 
 import org.apache.wicket.Component;
+import org.apache.wicket.util.lang.Args;
 
 /**
-*
-*/
+ *
+ */
 class AssignInstanceAction implements Action
 {
 
 	private final Field field;
+	
 	private final String id;
 
 	public AssignInstanceAction(Field field, String id)
 	{
-		this.field = field;
-		this.id = id;
-	}
-
-	@Override
-	public String toString()
-	{
-		return "Assign instance with id " + id + " to field " + field.getName();
+		this.field = Args.notNull(field, "field");
+		this.id = Args.notEmpty(id, "id");
 	}
 
 	@Override
@@ -34,39 +29,59 @@ class AssignInstanceAction implements Action
 		try
 		{
 			Component instance = getInstance(field.getType(), component, id);
-			Utils.setValue(instance, component, field);
+			Utils.setChildComponent(instance, component, field);
 		}
-		catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e)
+		catch (Exception e)
 		{
 			e.printStackTrace();
 		}
 	}
 
-	private Component getInstance(final Class<?> componentClass, final Component enclosing,
-	                              final String id) throws NoSuchMethodException, InstantiationException,
-			IllegalAccessException, IllegalArgumentException, InvocationTargetException
+	private Component getInstance(final Class<?> componentClass, final Component enclosing, final String id) 
+			throws Exception
 	{
-		if (componentClass.getEnclosingClass() == null
-				|| Modifier.isStatic(componentClass.getModifiers()))
+		Class<?> enclosingClass = componentClass.getEnclosingClass();
+		if (enclosingClass == null || Modifier.isStatic(componentClass.getModifiers()))
 		{
 			// -- Static inner class or normal class
 			final Constructor<?> constructor = componentClass.getDeclaredConstructor(String.class);
-			constructor.setAccessible(true);
-			return (Component)constructor.newInstance(id);
+			boolean accessible = constructor.isAccessible();
+			try
+			{
+				constructor.setAccessible(true);
+				return (Component)constructor.newInstance(id);
+			}
+			finally
+			{
+				constructor.setAccessible(accessible);
+			}
 		}
 		else
 		{
-			if (enclosing != null
-					&& componentClass.getEnclosingClass().isAssignableFrom(enclosing.getClass()))
+			if (enclosing != null && enclosingClass.isAssignableFrom(enclosing.getClass()))
 			{
-				final Constructor<?> constructor = componentClass.getDeclaredConstructor(
-						componentClass.getEnclosingClass(), String.class);
-				constructor.setAccessible(true);
-				return (Component)constructor.newInstance(enclosing, id);
+				final Constructor<?> constructor = componentClass.getDeclaredConstructor(enclosingClass, String.class);
+				boolean accessible = constructor.isAccessible();
+				try
+				{
+					constructor.setAccessible(true);
+					return (Component)constructor.newInstance(enclosing, id);
+				}
+				finally
+				{
+					constructor.setAccessible(accessible);
+				}
 			}
 			throw new RuntimeException("Unable to initialize inner class "
-					+ componentClass.getClass().getSimpleName() + " with id " + id
+					+ componentClass.getName() + " with id " + id
 					+ ". Enclosing class is not in the component hierarchy.");
 		}
 	}
+
+	@Override
+	public String toString()
+	{
+		return "Assign instance with id " + id + " to field " + field.getName();
+	}
+
 }

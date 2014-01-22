@@ -9,42 +9,51 @@ import org.apache.wicket.MarkupContainer;
 import org.apache.wicket.markup.html.border.Border;
 
 /**
-*
-*/
+ * Meta data for a Component
+ */
 class Node
 {
 
-	public String id = null;
-	Node parent = null;
-	Field field = null;
-	List<Node> childNodes = new ArrayList<>();
+	/**
+	 * The component id
+	 */
+	String id;
+
+	/**
+	 * The parent node of this
+	 */
+	Node parent;
+
+	Field field;
+
+	/**
+	 * All children of this node
+	 */
+	List<Node> children = new ArrayList<>();
+
+	/**
+	 * A flag indicating whether the component represented by this node is a Border
+	 */
 	boolean border = false;
+
 	long lastUsed = System.currentTimeMillis();
 
-	public void add(Node child)
+	void addChild(Node child)
 	{
 		child.parent = this;
-		childNodes.add(child);
+		children.add(child);
 	}
 
-	@Override
-	public String toString()
-	{
-		return "Node{" + "field=" + ((field != null) ? field.getName() : null)
-				+ ", childNodes=" + childNodes + ", border=" + border + ", id='" + id + '\''
-				+ '}';
-	}
-
-	public void initialize(Component component)
+	void initialize(Component component)
 	{
 		initialize(component, component);
 	}
 
 	private void initialize(Component root, Component parent)
 	{
-		for (Node child : childNodes)
+		for (Node child : children)
 		{
-			Component value = Utils.getValue(root, child.field);
+			Component value = Utils.getChildComponent(root, child.field);
 			if (child.border)
 			{
 				((Border)parent).addToBorder(value);
@@ -53,11 +62,18 @@ class Node
 			{
 				((MarkupContainer)parent).add(value);
 			}
-			if (!child.childNodes.isEmpty())
+			if (!child.children.isEmpty())
 			{
 				child.initialize(root, value);
 			}
 		}
 	}
 
+	@Override
+	public String toString()
+	{
+		return "Node{" + "field=" + ((field != null) ? field.getName() : null)
+				+ ", children=" + children + ", border=" + border + ", id='" + id + '\''
+				+ '}';
+	}
 }
