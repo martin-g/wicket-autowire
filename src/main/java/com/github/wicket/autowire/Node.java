@@ -13,7 +13,6 @@ import org.apache.wicket.markup.html.border.Border;
  */
 class Node
 {
-
 	/**
 	 * The component id
 	 */

@@ -39,11 +39,11 @@ class Value
 		this.instantiationActions = Args.notNull(instantiationActions, "instantiationActions");
 	}
 
-	void performInstantiationActions(Component component)
+	void performInstantiationActions(MarkupContainer container)
 	{
 		for (Action action : instantiationActions)
 		{
-			action.perform(component);
+			action.perform(container);
 		}
 	}
 
@@ -111,11 +111,7 @@ class Value
 		// detect borders.
 		boolean addToBorder = false;
 
-		boolean traceEnabled = LOGGER.isTraceEnabled();
-		if (traceEnabled)
-		{
-			LOGGER.trace("Performing auto wiring for component '{}'", component);
-		}
+		LOGGER.trace("Performing auto wiring for component '{}'", component);
 
 		// no associated markup: component tag is part of the markup
 		MarkupElement containerTag = null;
@@ -123,10 +119,8 @@ class Value
 		// component tag of component is part its markup.
 		if (skipFirstComponentTag(component, stream))
 		{
-			if (traceEnabled)
-			{
-				LOGGER.trace("Skipped component tag '{}'", stream.get());
-			}
+			LOGGER.trace("Skipped component tag '{}'", stream.get());
+
 			containerTag = stream.get();
 			stream.next();
 		}
@@ -135,36 +129,31 @@ class Value
 		{
 			final ComponentTag tag = stream.getTag();
 
-			if (traceEnabled)
-			{
-				LOGGER.trace("Processing tag '{}'", tag);
-			}
+			LOGGER.trace("Processing tag '{}'", tag);
 
 			// track border tags
 			if (tag instanceof WicketTag)
 			{
-				if (((WicketTag)tag).isBorderTag() && tag.isOpen())
+				WicketTag wicketTag = (WicketTag) tag;
+				if (wicketTag.isBorderTag() && tag.isOpen())
 				{
 					addToBorder = true;
 				}
-				else if (((WicketTag)tag).isBodyTag() && tag.isOpen())
+				else if (wicketTag.isBodyTag() && tag.isOpen())
 				{
 					addToBorder = false;
 				}
-				else if (((WicketTag)tag).isBodyTag() && tag.isClose())
+				else if (wicketTag.isBodyTag() && tag.isClose())
 				{
 					addToBorder = true;
 				}
-				else if (((WicketTag)tag).isBorderTag() && tag.isClose())
+				else if (wicketTag.isBorderTag() && tag.isClose())
 				{
 					addToBorder = false;
 				}
 			}
 
-			if (traceEnabled)
-			{
-				LOGGER.trace("addToBorder? '{}'", addToBorder);
-			}
+			LOGGER.trace("addToBorder? '{}'", addToBorder);
 
 			// maintain bread crumbs and build components
 			if (isComponentTag(tag))
@@ -175,10 +164,8 @@ class Value
 					final Component cmp;
 					final Node child = new Node();
 
-					if (traceEnabled)
-					{
-						LOGGER.trace("Current parent component is '{}'", container);
-					}
+					LOGGER.trace("Current parent component is '{}'", container);
+
 					if (container == null)
 					{
 						cmp = null;
@@ -188,23 +175,13 @@ class Value
 						cmp = Utils.buildComponent(component, tag.getId(), child);
 					}
 
-					if (traceEnabled)
-					{
-						LOGGER.trace("Resolved component is '{}'. Adding to parent now.", cmp);
-					}
+					LOGGER.trace("Resolved component is '{}'. Adding to parent now.", cmp);
 
 					if (cmp != null)
 					{
 						if (container instanceof MarkupContainer)
 						{
-							if (addToBorder && container instanceof Border)
-							{
-								child.border = true;
-							}
-							else
-							{
-								child.border = false;
-							}
+							child.border = addToBorder && container instanceof Border;
 							child.id = cmp.getId();
 							node.addChild(child);
 						}
@@ -224,19 +201,15 @@ class Value
 					// auto-wired
 					if (tag.isOpen() && !tag.hasNoCloseTag())
 					{
-						if (traceEnabled)
-						{
-							LOGGER.trace("Tag has a body. Adding to stack now.");
-						}
+						LOGGER.trace("Tag has a body. Adding to stack now.");
+
 						stack.push(new AtomicReference<>(cmp));
 						if (cmp != null)
 						{
 							node = child;
 						}
-						if (traceEnabled)
-						{
-							LOGGER.trace("Current stack: '{}'", stack);
-						}
+
+						LOGGER.trace("Current stack: '{}'", stack);
 					}
 				}
 				else if (tag.isClose() && !tag.getOpenTag().isAutoComponentTag())
@@ -245,27 +218,23 @@ class Value
 					// not pop stack on container tag close.
 					if (containerTag == null || !tag.closes(containerTag))
 					{
-						if (traceEnabled)
-						{
-							LOGGER.trace("Tag is closing. Pop the stack now.");
-						}
+						LOGGER.trace("Tag is closing. Pop the stack now.");
+
 						if (stack.pop().get() != null)
 						{
 							node = node.parent;
 						}
-						if (traceEnabled)
-						{
-							LOGGER.trace("Current stack: '{}'", stack);
-						}
+
+						LOGGER.trace("Current stack: '{}'", stack);
 					}
 				}
 			}
-			if (traceEnabled)
-			{
-				LOGGER.trace("--- Tag done. ---");
-			}
+
+			LOGGER.trace("--- Tag done. ---");
+
 			stream.next();
 		}
+
 		if (stack.size() != 1)
 		{
 			throw new RuntimeException("Stack must only contain one element " + stack);
@@ -277,12 +246,10 @@ class Value
 	private boolean skipFirstComponentTag(Component component, MarkupStream stream)
 	{
 		MarkupElement currentElement = stream.get();
-		if (currentElement instanceof ComponentTag
-				&& ((ComponentTag) currentElement).getId().equals(component.getId()))
-		{
-			return true;
-		}
-		else return component instanceof ListItem;
+		boolean hasSameId = currentElement instanceof ComponentTag
+				&& ((ComponentTag) currentElement).getId().equals(component.getId());
+
+		return hasSameId || component instanceof ListItem;
 	}
 
 	private boolean isComponentTag(ComponentTag tag)

@@ -5,6 +5,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
 import org.apache.wicket.Component;
+import org.apache.wicket.MarkupContainer;
 import org.apache.wicket.util.lang.Args;
 
 /**
@@ -24,12 +25,12 @@ class AssignInstanceAction implements Action
 	}
 
 	@Override
-	public void perform(Component component)
+	public void perform(MarkupContainer parent)
 	{
 		try
 		{
-			Component instance = getInstance(field.getType(), component, id);
-			Utils.setChildComponent(instance, component, field);
+			Component instance = getInstance(field.getType(), parent, id);
+			Utils.setChildComponent(instance, parent, field);
 		}
 		catch (Exception e)
 		{

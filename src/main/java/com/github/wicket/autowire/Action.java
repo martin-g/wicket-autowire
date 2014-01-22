@@ -1,11 +1,11 @@
 package com.github.wicket.autowire;
 
-import org.apache.wicket.Component;
+import org.apache.wicket.MarkupContainer;
 
 /**
 *
 */
 interface Action
 {
-	void perform(Component component);
+	void perform(MarkupContainer container);
 }

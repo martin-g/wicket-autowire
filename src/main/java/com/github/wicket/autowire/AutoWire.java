@@ -36,18 +36,17 @@ public final class AutoWire
 			IComponentInstantiationListener
 {
 
-	private static final Logger log = LoggerFactory.getLogger(Component.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(Component.class);
 
 	private static final ComponentCache CACHE = new ComponentCache();
 
 	private AutoWire()
 	{
-
 	}
 
 	public static void install(final Application application)
 	{
-		final AutoWire instance = new AutoWire();
+		AutoWire instance = new AutoWire();
 
 		application.getComponentInstantiationListeners().add(instance);
 		application.getComponentInitializationListeners().add(instance);
@@ -56,29 +55,34 @@ public final class AutoWire
 	@Override
 	public void onInstantiation(final Component component)
 	{
-		Class<? extends Component> componentClass = component.getClass();
-		Value value = CACHE.get(componentClass);
-		if (value == null)
+		if (isAutoWiringPossible(component))
 		{
-			log.trace("MISS: {}", componentClass);
+			MarkupContainer container = (MarkupContainer) component;
 
-			synchronized (AutoWire.class)
+			Class<? extends Component> containerClass = container.getClass();
+			Value value = CACHE.get(containerClass);
+			if (value == null)
 			{
-				value = CACHE.get(componentClass);
-				if (value == null)
-				{
-					List<Action> actions = getInstantiationActions(component);
+				LOGGER.trace("MISS: {}", containerClass);
 
-					value = new Value(actions);
-					Value old = CACHE.putIfAbsent(componentClass, value);
-					if (old != null)
+				synchronized (AutoWire.class)
+				{
+					value = CACHE.get(containerClass);
+					if (value == null)
 					{
-						value = old;
+						List<Action> actions = getInstantiationActions(container);
+
+						value = new Value(actions);
+						Value old = CACHE.putIfAbsent(containerClass, value);
+						if (old != null)
+						{
+							value = old;
+						}
 					}
 				}
 			}
+			value.performInstantiationActions(container);
 		}
-		value.performInstantiationActions(component);
 	}
 
 	@Override
@@ -86,68 +90,62 @@ public final class AutoWire
 	{
 		if (isAutoWiringPossible(component))
 		{
+			MarkupContainer container = (MarkupContainer) component;
 			try
 			{
-				Value value = CACHE.get(component.getClass());
-				value.performInitializeActions((MarkupContainer) component);
+				Value value = CACHE.get(container.getClass());
+				value.performInitializeActions(container);
 			}
 			catch (final MarkupNotFoundException e)
 			{
-				log.error("================ Markup not found for '{}'", component);
+				LOGGER.error("================ Markup not found for '{}'", component);
 			}
 		}
 	}
 
-	private List<Action> getInstantiationActions(Component component)
+	private List<Action> getInstantiationActions(MarkupContainer container)
 	{
 		List<Action> actions = new ArrayList<>();
 
-		if (isAutoWiringPossible(component))
-		{
-			Set<String> done = new HashSet<>();
-			Class<?> clazz = component.getClass();
-			// iterate over class hierarchy
-			while (clazz != null && clazz.getName().startsWith("org.apache.wicket") == false)
-			{
-				log.trace("looking for fields in class '{}'", clazz);
+		Set<String> processed = new HashSet<>();
+		Class<?> clazz = container.getClass();
 
-				// iterate over declared field
-				for (final Field field : clazz.getDeclaredFields())
+		while (clazz != null && !clazz.getName().startsWith("org.apache.wicket"))
+		{
+			LOGGER.trace("looking for fields in class '{}'", clazz);
+
+			for (final Field field : clazz.getDeclaredFields())
+			{
+				if (field.isAnnotationPresent(AutoComponent.class))
 				{
-					if (field.isAnnotationPresent(AutoComponent.class))
+					AutoComponent ann = field.getAnnotation(AutoComponent.class);
+					if (ann.inject())
 					{
-						AutoComponent ann = field.getAnnotation(AutoComponent.class);
-						if (ann.inject())
+						String annotationId = ann.id();
+						String fieldName = field.getName();
+						final String id = Strings.isEmpty(annotationId) ? fieldName : annotationId;
+						// fields in super classes are ignored, if they are
+						// in subclasses too
+						if (!processed.contains(id))
 						{
-							String annotationId = ann.id();
-							String fieldName = field.getName();
-							final String id = Strings.isEmpty(annotationId) ? fieldName : annotationId;
-							// fields in super classes are ignored, if they are
-							// in subclasses too
-							if (!done.contains(id))
+							processed.add(id);
+							Component childComponent = Utils.getChildComponent(container, field);
+							if (childComponent == null)
 							{
-								done.add(id);
-								Component value = Utils.getChildComponent(component, field);
-								if (value == null)
-								{
-									actions.add(new AssignInstanceAction(field, id));
-								}
-								else
-								{
-									log.trace("Field '{}' is already initialized. Skipping.", fieldName);
-								}
+								actions.add(new AssignInstanceAction(field, id));
+							}
+							else
+							{
+								LOGGER.trace("Field '{}' is already initialized. Skipping.", fieldName);
 							}
 						}
 					}
 				}
-				clazz = clazz.getSuperclass();
 			}
+			clazz = clazz.getSuperclass();
 		}
 
-		if (log.isTraceEnabled())
-		{
-			log.trace("Actions: " + actions);
-		}
+		LOGGER.trace("Actions: '{}'", actions);
 
 		return actions;
 	}
